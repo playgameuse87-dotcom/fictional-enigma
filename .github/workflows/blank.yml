@@ -1,0 +1,70 @@
+
+name: Build Unity Android
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Unity Android Project
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Récupération du code
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # 2. Cache Unity
+      - name: Unity Cache
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/unity3d
+          key: Unity-${{ runner.os }}
+      
+      # 3. Installer Unity (2022.3.20f1)
+      - name: Install Unity
+        uses: game-ci/unity-installer@v3
+        with:
+          unityVersion: 2022.3.20f1
+          modules: android
+
+      # 4. Build Android (APK + AAB)
+      - name: Build Android
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+        with:
+          targetPlatform: Android
+          buildName: LudoDream
+          androidExportType: androidPackage
+          allowDirtyBuild: true
+
+      # 5. Upload artefacts (APK & AAB)
+      - name: Upload Build
+        uses: actions/upload-artifact@v3
+        with:
+          name: Android-Build
+          path: build/Android/
+
+  release:
+    name: Publish Release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: Android-Build
+          path: ./ReleaseFiles
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ./ReleaseFiles/**
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
